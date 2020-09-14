@@ -1,3 +1,3 @@
-# 2020-personal-python
+# xlh's python 
 
-这是第一个真正学会github的程序
+这是第一个真正学会github的python程序
