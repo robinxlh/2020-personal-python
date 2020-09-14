@@ -1,4 +1,3 @@
 # 2020-personal-python
 
-请修改 README
-12312321312
+这是第一个真正学会github的程序
