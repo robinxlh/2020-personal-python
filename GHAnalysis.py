@@ -3,12 +3,13 @@ import os
 import argparse
 import linecache
 import gc
-import multiprocessing
+from multiprocessing import Process
+
+
 class Data:
     def __init__(self, dict_address: int = None, reload: int = 0):
-        self.done=1
-        self.done1=0
-        if reload  == 1:
+        self.done = 1
+        if reload == 1:
             self.__4Events4PerP = {}  # 关联人与事件数
             self.__4Events4PerR = {}  # 关联项目与事件数
             self.__4Events4PerPPerR = {}  # 关联人与项目与事件数
@@ -19,27 +20,46 @@ class Data:
                 json.dump(self.__4Events4PerR, f)
             with open('3.json', 'w', encoding='utf-8') as f:
                 json.dump(self.__4Events4PerPPerR, f)
-        if dict_address is None and not os.path.exists('1.json') and not os.path.exists('2.json') and not os.path.exists('3.json'):     #要查却没文件
+        if dict_address is None and not os.path.exists('1.json') and not os.path.exists(
+                '2.json') and not os.path.exists('3.json'):  # 要查却没文件
             raise RuntimeError('error: init failed')
-        x = open('1.json', 'r', encoding='utf-8').read()    #打开
-        self.__4Events4PerP = json.loads(x)     #解码json数据
+        x = open('1.json', 'r', encoding='utf-8').read()  # 打开
+        self.__4Events4PerP = json.loads(x)  # 解码json数据
         x = open('2.json', 'r', encoding='utf-8').read()
         self.__4Events4PerR = json.loads(x)
         x = open('3.json', 'r', encoding='utf-8').read()
         self.__4Events4PerPPerR = json.loads(x)
 
     def __init(self, dict_address: str):
-        i=0
-        pool = multiprocessing.Pool(processes=4)
+        i = 0
         for root, dic, files in os.walk(dict_address):
+            if len(files) % 2:
+                self.fly(files[0], dict_address)
+                del files[0]
+            file1 = []
+            file2 = []
             for f in files:
-                pool.apply_async(self.fly, args=(f,dict_address,))
-                # print(self.__4Events4PerP,'1')
-        pool.close()
-        pool.join()
+                i += 1
+                if i % 2:
+                    file1.append(f)
+                else:
+                    file2.append(f)
+            for f1, f2 in zip(file1, file2):  # 找格式文件
+                processes = []
+                processes.append(Process(target=self.fly,args=(f1,dict_address,)))
+                processes.append(Process(target=self.fly,args=(f2, dict_address,)))
+                for process in processes:
+                    process.start()
+                for process in processes:
+                    process.join()
+                print("stop")
+                # p1 = multiprocessing.Process(target=self.fly(f1,dict_address), args=(2,))
+                # p2 = multiprocessing.Process(target=self.fly(f2,dict_address), args=(3,))
+                # p1.start()
+                # p2.start()
+                # for i in range(4):
 
-    def fly(self,f,dict_address):
-        self.done1+=1
+    def fly(self, f, dict_address):
         if f[-5:] == '.json':
             json_list = []  # 读入
             x = open(dict_address + '\\' + f,
@@ -51,28 +71,29 @@ class Data:
                     json_list.append(json.loads(_str))
                 except:  # 注意
                     pass
-            print(self.done1,i)
+            print(i)
             i += 1
             self.solve(json_list)
             del x, str_list, json_list
             gc.collect()
             # print(x)
-    def solve(self,json_list):
-        records = self.__listOfNestedDict2ListOfDict(json_list)   #带所有字典的列表
+
+    def solve(self, json_list):
+        records = self.__listOfNestedDict2ListOfDict(json_list)  # 带所有字典的列表
         for i in records:
-            if not self.__4Events4PerP.get(i['actor__login'], 0):    #字典中若不存在这个人
-                self.__4Events4PerP.update({i['actor__login']: {}})     #加入这个人
-                self.__4Events4PerPPerR.update({i['actor__login']: {}})     #加入
+            if not self.__4Events4PerP.get(i['actor__login'], 0):  # 字典中若不存在这个人
+                self.__4Events4PerP.update({i['actor__login']: {}})  # 加入这个人
+                self.__4Events4PerPPerR.update({i['actor__login']: {}})  # 加入
             self.__4Events4PerP[i['actor__login']][i['type']
-                                         ] = self.__4Events4PerP[i['actor__login']].get(i['type'], 0)+1     #这项事件数加一
-            if not self.__4Events4PerR.get(i['repo__name'], 0):     #若字典中没有这个项目
-                self.__4Events4PerR.update({i['repo__name']: {}})       #创建
+            ] = self.__4Events4PerP[i['actor__login']].get(i['type'], 0) + 1  # 这项事件数加一
+            if not self.__4Events4PerR.get(i['repo__name'], 0):  # 若字典中没有这个项目
+                self.__4Events4PerR.update({i['repo__name']: {}})  # 创建
             self.__4Events4PerR[i['repo__name']][i['type']
-                                       ] = self.__4Events4PerR[i['repo__name']].get(i['type'], 0)+1     #这个项目此次事件加一
-            if not self.__4Events4PerPPerR[i['actor__login']].get(i['repo__name'], 0):      #若这个人字典中没有这个项目
-                self.__4Events4PerPPerR[i['actor__login']].update({i['repo__name']: {}})    #创建
+            ] = self.__4Events4PerR[i['repo__name']].get(i['type'], 0) + 1  # 这个项目此次事件加一
+            if not self.__4Events4PerPPerR[i['actor__login']].get(i['repo__name'], 0):  # 若这个人字典中没有这个项目
+                self.__4Events4PerPPerR[i['actor__login']].update({i['repo__name']: {}})  # 创建
             self.__4Events4PerPPerR[i['actor__login']][i['repo__name']][i['type']
-                                                          ] = self.__4Events4PerPPerR[i['actor__login']][i['repo__name']].get(i['type'], 0)+1  #人的项目的事件数加一
+            ] = self.__4Events4PerPPerR[i['actor__login']][i['repo__name']].get(i['type'], 0) + 1  # 人的项目的事件数加一
 
         # if self.done==1:
         #     with open('1.json', 'w', encoding='utf-8') as f:  # 初始化
@@ -97,16 +118,16 @@ class Data:
         #     else:
         #         _k = f'{prefix}__{k}' if prefix != '' else k    #把字典里的字典整到外面
         #         _d[_k] = d[k]
-        for k in d.keys():          #键
+        for k in d.keys():  # 键
             if str(type(d[k]))[-6:-2] == 'dict':
-                list=[]
-                list1=[]
+                list = []
+                list1 = []
                 list.append(d[k])
                 list1.append(k)
                 while list:
-                    d2=list[0]
-                    prefix=list1[0]
-                    del list[0],list1[0]
+                    d2 = list[0]
+                    prefix = list1[0]
+                    del list[0], list1[0]
                     for k1 in d2.keys():
                         if str(type(d2[k1]))[-6:-2] == 'dict':
                             list.append(d2[k1])
@@ -122,31 +143,31 @@ class Data:
 
     def __listOfNestedDict2ListOfDict(self, a: list):
         records = []
-        for d in a:         #d:一条项目
+        for d in a:  # d:一条项目
             _d = self.__parseDict(d, '')
-            records.append(_d)  #字典放入列表，列表存有所有项目
+            records.append(_d)  # 字典放入列表，列表存有所有项目
 
         return records
 
-    def getEventsUsers(self, username: str, event: str) -> int:         #事件一
-        if not self.__4Events4PerP.get(username,0):         #找不到人
+    def getEventsUsers(self, username: str, event: str) -> int:  # 事件一
+        if not self.__4Events4PerP.get(username, 0):  # 找不到人
             return 0
         else:
-            return self.__4Events4PerP[username].get(event,0)
+            return self.__4Events4PerP[username].get(event, 0)
 
-    def getEventsRepos(self, reponame: str, event: str) -> int:         #事件二
-        if not self.__4Events4PerR.get(reponame,0):         #找不到项目
+    def getEventsRepos(self, reponame: str, event: str) -> int:  # 事件二
+        if not self.__4Events4PerR.get(reponame, 0):  # 找不到项目
             return 0
         else:
-            return self.__4Events4PerR[reponame].get(event,0)
+            return self.__4Events4PerR[reponame].get(event, 0)
 
-    def getEventsUsersAndRepos(self, username: str, reponame: str, event: str) -> int:      #事件三
-        if not self.__4Events4PerP.get(username,0):     #找不到人
+    def getEventsUsersAndRepos(self, username: str, reponame: str, event: str) -> int:  # 事件三
+        if not self.__4Events4PerP.get(username, 0):  # 找不到人
             return 0
-        elif not self.__4Events4PerPPerR[username].get(reponame,0):     #找不到项目
+        elif not self.__4Events4PerPPerR[username].get(reponame, 0):  # 找不到项目
             return 0
         else:
-            return self.__4Events4PerPPerR[username][reponame].get(event,0)
+            return self.__4Events4PerPPerR[username][reponame].get(event, 0)
 
 
 class Run:
@@ -168,19 +189,20 @@ class Run:
             return 0
         else:
             if self.data is None:
-                self.data = Data()      #创建变量
-            if self.parser.parse_args().event:      #必有事件
-                if self.parser.parse_args().user:       #事件一或三
-                    if self.parser.parse_args().repo:       #事件三
+                self.data = Data()  # 创建变量
+            if self.parser.parse_args().event:  # 必有事件
+                if self.parser.parse_args().user:  # 事件一或三
+                    if self.parser.parse_args().repo:  # 事件三
                         res = self.data.getEventsUsersAndRepos(
-                            self.parser.parse_args().user, self.parser.parse_args().repo, self.parser.parse_args().event)
-                    else:                                   #事件一
+                            self.parser.parse_args().user, self.parser.parse_args().repo,
+                            self.parser.parse_args().event)
+                    else:  # 事件一
                         res = self.data.getEventsUsers(
                             self.parser.parse_args().user, self.parser.parse_args().event)
-                elif self.parser.parse_args().repo:         #事件二
+                elif self.parser.parse_args().repo:  # 事件二
                     res = self.data.getEventsRepos(
                         self.parser.parse_args().repo, self.parser.parse_args().event)
-                else:                                       #格式错误
+                else:  # 格式错误
                     raise RuntimeError('error: argument -l or -c are required')
             else:
                 raise RuntimeError('error: argument -e is required')
