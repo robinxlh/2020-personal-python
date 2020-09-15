@@ -7,6 +7,7 @@ import multiprocessing
 class Data:
     def __init__(self, dict_address: int = None, reload: int = 0):
         self.done=1
+        self.done1=0
         if reload  == 1:
             self.__4Events4PerP = {}  # 关联人与事件数
             self.__4Events4PerR = {}  # 关联项目与事件数
@@ -28,26 +29,34 @@ class Data:
         self.__4Events4PerPPerR = json.loads(x)
 
     def __init(self, dict_address: str):
-        i=1
+        i=0
+        pool = multiprocessing.Pool(processes=4)
         for root, dic, files in os.walk(dict_address):
-            for f in files:     #找格式文件
-                if f[-5:] == '.json':
-                    json_list = []#读入
-                    x = open(dict_address + '\\' + f,
-                             'r', encoding='utf-8').read()
-                    str_list = [_x for _x in x.split('\n') if len(_x) > 0]
-                    # str_list = [_x for _x in x.split('\n') if len(_x) > 0]
-                    for i, _str in enumerate(str_list):         #序号，每列字符
-                        try:
-                            json_list.append(json.loads(_str))
-                        except:             #注意
-                            pass
-                    print(i)
-                    i+=1
-                    self.solve(json_list)
-                    del x,str_list,json_list
-                    gc.collect()
-                    # print(x)
+            for f in files:
+                pool.apply_async(self.fly, args=(f,dict_address,))
+                # print(self.__4Events4PerP,'1')
+        pool.close()
+        pool.join()
+
+    def fly(self,f,dict_address):
+        self.done1+=1
+        if f[-5:] == '.json':
+            json_list = []  # 读入
+            x = open(dict_address + '\\' + f,
+                     'r', encoding='utf-8').read()
+            str_list = [_x for _x in x.split('\n') if len(_x) > 0]
+            # str_list = [_x for _x in x.split('\n') if len(_x) > 0]
+            for i, _str in enumerate(str_list):  # 序号，每列字符
+                try:
+                    json_list.append(json.loads(_str))
+                except:  # 注意
+                    pass
+            print(self.done1,i)
+            i += 1
+            self.solve(json_list)
+            del x, str_list, json_list
+            gc.collect()
+            # print(x)
     def solve(self,json_list):
         records = self.__listOfNestedDict2ListOfDict(json_list)   #带所有字典的列表
         for i in records:
@@ -170,7 +179,7 @@ class Run:
                             self.parser.parse_args().user, self.parser.parse_args().event)
                 elif self.parser.parse_args().repo:         #事件二
                     res = self.data.getEventsRepos(
-                        self.parser.parse_args().reop, self.parser.parse_args().event)
+                        self.parser.parse_args().repo, self.parser.parse_args().event)
                 else:                                       #格式错误
                     raise RuntimeError('error: argument -l or -c are required')
             else:
@@ -179,5 +188,4 @@ class Run:
 
 
 if __name__ == '__main__':
-
     a = Run()
