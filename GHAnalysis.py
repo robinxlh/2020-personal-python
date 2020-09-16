@@ -3,7 +3,8 @@ import os
 import argparse
 import linecache
 import gc
-from multiprocessing import Process
+import multiprocessing
+import shutil
 class Data:
     def __init__(self, dict_address: int = None, reload: int = 0):
         self.done=1
@@ -12,7 +13,17 @@ class Data:
             self.__4Events4PerP = {}  # 关联人与事件数
             self.__4Events4PerR = {}  # 关联项目与事件数
             self.__4Events4PerPPerR = {}  # 关联人与项目与事件数
-            self.__init(dict_address)
+            try:
+                os.makedirs('json_1')
+            except:
+                # os.remove('json_1')     #无法删除
+                shutil.rmtree('json_1')  # 可以
+                os.makedirs('json_1')
+            self.__init(dict_address,1)
+            self.__4Events4PerP = {}  # 关联人与事件数
+            self.__4Events4PerR = {}  # 关联项目与事件数
+            self.__4Events4PerPPerR = {}  # 关联人与项目与事件数
+            self.__init(dict_address, 0)
             with open('1.json', 'w', encoding='utf-8') as f:  # 初始化
                 json.dump(self.__4Events4PerP, f)  # 写入
             with open('2.json', 'w', encoding='utf-8') as f:
@@ -28,27 +39,26 @@ class Data:
         x = open('3.json', 'r', encoding='utf-8').read()
         self.__4Events4PerPPerR = json.loads(x)
 
-    def __init(self, dict_address: str):
+    def __init(self, dict_address: str,k=1):
         i=0
-        for root, dic, files in os.walk(dict_address):
-            processes = []
-            for f in files:
-                if i<3:
-                    i+=1
-                    processes.append(Process(target=self.fly, args=(f, dict_address,i,)))
-                else:
-                    i=0
-                    processes.append(Process(target=self.fly, args=(f, dict_address, i,)))
-                    for process in processes:
-                        process.start()
-                    for process in processes:
-                        process.join()
-                    processes=[]
-            for process in processes:   #防止文件非整
-                process.start()
-            for process in processes:
-                process.join()
-    def fly(self,f,dict_address,k):
+        if k:
+            pool = multiprocessing.Pool(processes=4)
+            for root, dic, files in os.walk(dict_address):
+                for f in files:
+                    pool.apply_async(self.fly, args=(f,dict_address,))
+                    # print(self.__4Events4PerP,'1')
+            pool.close()
+            pool.join()
+        else:
+            for root, dic, files in os.walk(dict_address):
+                for f in files:  # 找格式文件
+                    if f[-5:] == '.json':
+                        x = open('json_1\\' + f,
+                                 'r', encoding='utf-8').read()
+                        x= json.loads(x)
+                        self.solve1(x)
+
+    def fly(self,f,dict_address):
         self.done1+=1
         if f[-5:] == '.json':
             json_list = []  # 读入
@@ -61,15 +71,14 @@ class Data:
                     json_list.append(json.loads(_str))
                 except:  # 注意
                     pass
-            print(k,i)
+            print(self.done1,i)
             i += 1
             self.solve(json_list,f)
             del x, str_list, json_list
             gc.collect()
             # print(x)
-    def solve(self,json_list,f1):
-        records = self.__listOfNestedDict2ListOfDict(json_list)   #带所有字典的列表
-        for i in records:
+    def solve1(self,json_list):
+        for i in json_list:
             if not self.__4Events4PerP.get(i['actor__login'], 0):    #字典中若不存在这个人
                 self.__4Events4PerP.update({i['actor__login']: {}})     #加入这个人
                 self.__4Events4PerPPerR.update({i['actor__login']: {}})     #加入
@@ -83,31 +92,28 @@ class Data:
                 self.__4Events4PerPPerR[i['actor__login']].update({i['repo__name']: {}})    #创建
             self.__4Events4PerPPerR[i['actor__login']][i['repo__name']][i['type']
                                                           ] = self.__4Events4PerPPerR[i['actor__login']][i['repo__name']].get(i['type'], 0)+1  #人的项目的事件数加一
-        try:
-            os.makedirs('json_1')
-        except:
-            pass
-        with open('json_1\\'+f1+'1.json', 'w', encoding='utf-8') as f:  # 初始化
-            json.dump(self.__4Events4PerP, f)  # 写入
-        with open('json_1\\'+f1+'2.json', 'w', encoding='utf-8') as f:
-            json.dump(self.__4Events4PerR, f)
-        with open('json_1\\'+f1+'3.json', 'w', encoding='utf-8') as f:
-            json.dump(self.__4Events4PerPPerR, f)
-        # print(self.__4Events4PerP)
-        # if self.done==1:
-        #     with open('1.json', 'w', encoding='utf-8') as f:  # 初始化
-        #         json.dump(self.__4Events4PerP, f)  # 写入
-        #     with open('2.json', 'w', encoding='utf-8') as f:
-        #         json.dump(self.__4Events4PerR, f)
-        #     with open('3.json', 'w', encoding='utf-8') as f:
-        #         json.dump(self.__4Events4PerPPerR, f)
-        # else:
-        #     with open('1.json', 'a', encoding='utf-8') as f:        #初始化
-        #         json.dump(self.__4Events4PerP,f)        #写入
-        #     with open('2.json', 'a', encoding='utf-8') as f:
-        #         json.dump(self.__4Events4PerR,f)
-        #     with open('3.json', 'a', encoding='utf-8') as f:
-        #         json.dump(self.__4Events4PerPPerR,f)
+
+    def solve(self,json_list,f1):
+        records = self.__listOfNestedDict2ListOfDict(json_list)   #带所有字典的列表
+        k=[]
+        for i in records:
+            k.append({'actor__login':i['actor__login'],'type':i['type'],'repo__name':i['repo__name']})
+            # if not self.__4Events4PerP.get(i['actor__login'], 0):    #字典中若不存在这个人
+            #     self.__4Events4PerP.update({i['actor__login']: {}})     #加入这个人
+            #     self.__4Events4PerPPerR.update({i['actor__login']: {}})     #加入
+            # self.__4Events4PerP[i['actor__login']][i['type']
+            #                              ] = self.__4Events4PerP[i['actor__login']].get(i['type'], 0)+1     #这项事件数加一
+            # if not self.__4Events4PerR.get(i['repo__name'], 0):     #若字典中没有这个项目
+            #     self.__4Events4PerR.update({i['repo__name']: {}})       #创建
+            # self.__4Events4PerR[i['repo__name']][i['type']
+            #                            ] = self.__4Events4PerR[i['repo__name']].get(i['type'], 0)+1     #这个项目此次事件加一
+            # if not self.__4Events4PerPPerR[i['actor__login']].get(i['repo__name'], 0):      #若这个人字典中没有这个项目
+            #     self.__4Events4PerPPerR[i['actor__login']].update({i['repo__name']: {}})    #创建
+            # self.__4Events4PerPPerR[i['actor__login']][i['repo__name']][i['type']
+            #                                               ] = self.__4Events4PerPPerR[i['actor__login']][i['repo__name']].get(i['type'], 0)+1  #人的项目的事件数加一
+        with open('json_1\\'+f1, 'w', encoding='utf-8') as f:  # 初始化
+            json.dump(k, f)  # 写入
+
 
     def __parseDict(self, d: dict, prefix: str):
         _d = {}
@@ -199,7 +205,7 @@ class Run:
                             self.parser.parse_args().user, self.parser.parse_args().event)
                 elif self.parser.parse_args().repo:         #事件二
                     res = self.data.getEventsRepos(
-                        self.parser.parse_args().reop, self.parser.parse_args().event)
+                        self.parser.parse_args().repo, self.parser.parse_args().event)
                 else:                                       #格式错误
                     raise RuntimeError('error: argument -l or -c are required')
             else:
