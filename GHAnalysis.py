@@ -30,6 +30,7 @@ class Data:
                 json.dump(self.__4Events4PerR, f)
             with open('3.json', 'w', encoding='utf-8') as f:
                 json.dump(self.__4Events4PerPPerR, f)
+            shutil.rmtree('json_1')
         if dict_address is None and not os.path.exists('1.json') and not os.path.exists('2.json') and not os.path.exists('3.json'):     #要查却没文件
             raise RuntimeError('error: init failed')
         x = open('1.json', 'r', encoding='utf-8').read()    #打开
