@@ -72,8 +72,6 @@ class Data:
                     json_list.append(json.loads(_str))
                 except:  # 注意
                     pass
-            print(self.done1,i)
-            i += 1
             self.solve(json_list,f)
             del x, str_list, json_list
             gc.collect()
